@@ -1,8 +1,11 @@
 -record(invd, {
     type :: atom()
-  , ga :: pid()
-  , fitness=unknown :: fitness()
   , genome :: genome()
+
+  , ga :: pid()
+  , index :: {non_neg_integer(), non_neg_integer()}
+
+  , fitness=unknown :: fitness()
 }).
 
 %% ----------------------------------------------------------------- %%
