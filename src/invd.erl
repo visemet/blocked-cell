@@ -1,11 +1,17 @@
 -module(invd).
 -behaviour(gen_server).
 
--export([start/3, get_state/1]).
+-export([start/3, evolve/1, get_state/1, send_state/1, receive_state/2]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
 -include("invd.hrl").
+
+-record(init, {}).
+
+-record(evolve, {
+    neighbors=[]
+}).
 
 %%% =============================================================== %%%
 %%%  API                                                            %%%
@@ -27,8 +33,20 @@ start(Type, Args, Options) when is_atom(Type), is_list(Options) ->
     gen_server:start(?MODULE, [Type, Args, Options], [])
 .
 
+evolve(Invd) when is_pid(Invd) ->
+    gen_server:cast(Invd, {evolve})
+.
+
 get_state(Invd) when is_pid(Invd) ->
     gen_server:call(Invd, {get_state})
+.
+
+send_state(Invd) when is_pid(Invd) ->
+    gen_server:cast(Invd, {send_state, erlang:self()})
+.
+
+receive_state(Invd, State = #invd{}) when is_pid(Invd) ->
+    gen_server:cast(Invd, {receive_state, State})
 .
 
 %% ----------------------------------------------------------------- %%
@@ -36,7 +54,7 @@ get_state(Invd) when is_pid(Invd) ->
 init([Type, Args, Options]) when is_atom(Type), is_list(Options) ->
     case Type:init(Args) of
         {ok, Genome} ->
-            init(Options, #invd{type=Type, genome=Genome})
+            init(Options, #invd{type=Type, genome=Genome, stage=#init{}})
 
       ; {error, Reason} ->
             {error, Reason}
@@ -56,7 +74,27 @@ handle_cast({evolve}, State = #invd{ga = GA, index = Index}) ->
 
   , io:format("neighbors ~p~n", [neighbors(GA, Index)])
 
+  , {noreply, State#invd{stage=#evolve{}}}
+;
+
+handle_cast({send_state, Invd}, State = #invd{}) ->
+    receive_state(Invd, State)
+
   , {noreply, State}
+;
+
+handle_cast(
+    {receive_state, NeighborState}
+  , State = #invd{
+        stage = Stage = #evolve{neighbors = Neighbors}
+    }
+) ->
+    {
+        noreply
+      , State#invd{
+            stage=Stage#evolve{neighbors=[NeighborState|Neighbors]}
+        }
+    }
 ;
 
 handle_cast(_Request, State) ->
