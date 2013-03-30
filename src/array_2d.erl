@@ -2,6 +2,8 @@
 
 -export([new/1, size/1, set/3, get/2, map/2, foldl/3]).
 
+-export_type([index/0]).
+
 -record(array_2d, {size = {0, 0}, default, elements}).
 
 %%% =============================================================== %%%
