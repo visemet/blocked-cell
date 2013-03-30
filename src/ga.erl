@@ -2,10 +2,12 @@
 -behaviour(gen_server).
 
 -export([start/4, get_neighbors/2]).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-         terminate/2, code_change/3]).
+-export([
+    init/1, handle_call/3, handle_cast/2, handle_info/2
+  , terminate/2, code_change/3
+]).
 
--record(ga, {type, gen_no, invds}).
+-record(ga, {type, invds}).
 
 %%% =============================================================== %%%
 %%%  API                                                            %%%
@@ -72,7 +74,6 @@ init([Size = {NRows, NCols}, GAType, InvdType, InvdArgs])
 
   , State = #ga{
         type=GAType
-      , gen_no=0
       , invds=Invds
     }
 
