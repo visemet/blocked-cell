@@ -34,15 +34,15 @@ tournament(Invds, [{prob, Prob} | Options], State = #tournament{}) ->
     tournament(Invds, Options, State#tournament{prob=Prob})
 .
 
-tournament_select(_Prob, [Invd]) ->
+tournament_select(_Prob, [{Invd, _Fitness}]) ->
     Invd
 ;
 
-tournament_select(Prob, [Invd | Invds]) ->
+tournament_select(Prob, [{Invd, _Fitness} | Rest]) ->
     Random = random:uniform()
   , if
       Random < Prob -> Invd
-    ; Random >= Prob -> tournament_select(Prob * (1 - Prob), Invds)
+    ; Random >= Prob -> tournament_select(Prob * (1 - Prob), Rest)
     end
 .
 
@@ -50,8 +50,8 @@ tournament_select(Prob, [Invd | Invds]) ->
 
 sort_by_fitness(ltg, Invds) ->
     lists:sort(
-        fun (#invd{fitness = Fitness1}, #invd{fitness = Fitness2}) ->
-            Fitness1 =< Fitness2
+        fun ({_InvdA, FitnessA}, {_InvdB, FitnessB}) ->
+            FitnessA =< FitnessB
         end
 
       , Invds
@@ -60,8 +60,8 @@ sort_by_fitness(ltg, Invds) ->
 
 sort_by_fitness(gtl, Invds) ->
     lists:sort(
-        fun (#invd{fitness = Fitness1}, #invd{fitness = Fitness2}) ->
-            Fitness1 >= Fitness2
+        fun ({_InvdA, FitnessA}, {_InvdB, FitnessB}) ->
+            FitnessA >= FitnessB
         end
 
       , Invds
