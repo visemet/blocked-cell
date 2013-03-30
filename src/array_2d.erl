@@ -1,6 +1,6 @@
 -module(array_2d).
 
--export([new/1, set/3, get/2, map/2, foldl/3]).
+-export([new/1, size/1, set/3, get/2, map/2, foldl/3]).
 
 -record(array_2d, {size = {0, 0}, default, elements}).
 
@@ -13,6 +13,8 @@
 %% ----------------------------------------------------------------- %%
 
 new(Options) when is_list(Options) -> new(Options, #array_2d{}).
+
+size(#array_2d{size = Size}) -> Size.
 
 set(
     {RowIndex, ColumnIndex}
