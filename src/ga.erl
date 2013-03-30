@@ -1,7 +1,7 @@
 -module(ga).
 -behaviour(gen_server).
 
--export([start/4, neighbors/2]).
+-export([start/4, get_neighbors/2]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
@@ -18,76 +18,86 @@
 
 %% ----------------------------------------------------------------- %%
 
-start(Size, GAType, InvdType, InvdArgs) ->
+start(Size = {NRows, NCols}, GAType, InvdType, InvdArgs)
+  when
+    is_integer(NRows), NRows >= 0
+  , is_integer(NCols), NCols >= 0
+  , is_atom(GAType)
+  , is_atom(InvdType)
+  ->
     gen_server:start(?MODULE, [Size, GAType, InvdType, InvdArgs], [])
 .
 
-neighbors(GA, Coord = {RowIndex, ColumnIndex})
+get_neighbors(GA, Index = {Row, Col})
   when
     is_pid(GA)
-  , is_integer(RowIndex), RowIndex >= 0
-  , is_integer(ColumnIndex), ColumnIndex >= 0
+  , is_integer(Row), Row >= 0
+  , is_integer(Col), Col >= 0
   ->
-    gen_server:call(GA, {neighbors, Coord})
+    gen_server:call(GA, {get_neighbors, Index})
 .
 
 %% ----------------------------------------------------------------- %%
 
-init([Size = {Rows, Columns}, GAType, InvdType, InvdArgs])
+init([Size = {NRows, NCols}, GAType, InvdType, InvdArgs])
   when
-    is_integer(Rows), Rows > 0
-  , is_integer(Columns), Columns > 0
+    is_integer(NRows), NRows >= 0
+  , is_integer(NCols), NCols >= 0
   , is_atom(GAType)
   , is_atom(InvdType)
   ->
-    State = #ga{
+    Invds = array_2d:map(
+        fun ({Row, Col}, undefined)
+          when
+            is_integer(Row), Row >= 0
+          , is_integer(Col), Col >= 0
+          ->
+            InvdOptions = [{ga, erlang:self()}, {index, {Row, Col}}]
+
+          , {ok, Invd} = invd:start(
+                InvdType
+              , InvdArgs
+              , InvdOptions
+            )
+
+          , invd:evolve(Invd)
+
+          , Invd
+        end
+
+      , array_2d:new([
+            {size, Size}
+        ])
+    )
+
+  , State = #ga{
         type=GAType
       , gen_no=0
-      , invds=array_2d:map(
-            fun ({RowIndex, ColumnIndex}, undefined)
-              when
-                is_integer(RowIndex), RowIndex >= 0
-              , is_integer(ColumnIndex), ColumnIndex >= 0
-              ->
-                {ok, Pid} = invd:start(
-                    InvdType
-                  , InvdArgs
-                  , [{ga, erlang:self()}, {index, {RowIndex, ColumnIndex}}]
-                )
-
-              , io:format("pid ~p~n", [Pid])
-
-              , Pid
-            end
-
-          , array_2d:new([
-                {size, Size}
-            ])
-        )
+      , invds=Invds
     }
 
   , {ok, State}
 .
 
 handle_call(
-    {neighbors, {RowIndex, ColumnIndex}}
+    {get_neighbors, {Row, Col}}
   , _From
   , State = #ga{type = Type, invds = Invds}
 ) when
-    is_integer(RowIndex), RowIndex >= 0
-  , is_integer(ColumnIndex), ColumnIndex >= 0
+    is_integer(Row), Row >= 0
+  , is_integer(Col), Col >= 0
   ->
     Neighbors = lists:map(
-        fun ({NRowIndex, NColumnIndex})
+        fun ({R, C})
           when
-            is_integer(NRowIndex), NRowIndex >= 0
-          , is_integer(NColumnIndex), NColumnIndex >= 0
+            is_integer(R), R >= 0
+          , is_integer(C), C >= 0
           ->
-            array_2d:get({NRowIndex, NColumnIndex}, Invds)
+            array_2d:get({R, C}, Invds)
         end
 
       , Type:get_neighbor_coords(
-            {RowIndex, ColumnIndex}
+            {Row, Col}
           , array_2d:size(Invds)
         )
     )
