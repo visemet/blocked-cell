@@ -1,9 +1,11 @@
 -module(invd).
 -behaviour(gen_server).
 
--export([start/3, evolve/1, get_state/1, send_state/1, receive_state/2]).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-         terminate/2, code_change/3]).
+-export([start/3, evolve/1, send_fitness/1]).
+-export([
+    init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2
+  , code_change/3
+]).
 
 -include("invd.hrl").
 
@@ -20,9 +22,9 @@
 
 -callback init(term()) -> genome().
 
--callback evaluate(genome()) -> float().
+-callback evaluate(genome()) -> number().
 
--callback select([#invd{}]) -> #invd{}.
+-callback select([{pid(), number()}]) -> pid().
 
 -callback crossover(genome(), genome()) -> genome().
 
@@ -38,16 +40,8 @@ evolve(Invd) when is_pid(Invd) ->
     gen_server:cast(Invd, {evolve})
 .
 
-get_state(Invd) when is_pid(Invd) ->
-    gen_server:call(Invd, {get_state})
-.
-
-send_state(Invd) when is_pid(Invd) ->
-    gen_server:cast(Invd, {send_state, erlang:self()})
-.
-
-receive_state(Invd, State = #invd{}) when is_pid(Invd) ->
-    gen_server:cast(Invd, {receive_state, State})
+send_fitness(Invd) when is_pid(Invd) ->
+    gen_server:cast(Invd, {send_fitness, erlang:self()})
 .
 
 %% ----------------------------------------------------------------- %%
@@ -62,72 +56,107 @@ init([Type, Args, Options]) when is_atom(Type), is_list(Options) ->
     end
 .
 
-handle_call({get_state}, _From, State = #invd{}) ->
-    {reply, State, State}
-;
-
 handle_call(_Request, _From, State) ->
     {reply, ok, State}
 .
 
 handle_cast({evolve}, State = #invd{ga = GA, index = Index}) ->
-    Remain = neighbors(GA, Index)
+    NewState = State#invd{
+        stage=#evolve{
+            neighbors=[]
+          , remain=signal_neighbors(GA, Index)
+        }
+    }
 
-  , {noreply, State#invd{stage=#evolve{remain = Remain}}}
+  , {noreply, NewState}
 ;
 
-handle_cast({send_state, Invd}, State = #invd{}) ->
-    receive_state(Invd, State)
+handle_cast(
+    {send_fitness, Invd}
+  , State = #invd{type = Type, genome = Genome, fitness = unknown}
+) when
+    is_pid(Invd)
+  ->
+    Fitness = Type:evaluate(Genome)
+  , gen_server:cast(Invd, {receive_fitness, {erlang:self(), Fitness}})
+
+  , NewState = State#invd{fitness=Fitness}
+  , {noreply, NewState}
+;
+
+handle_cast({send_fitness, Invd}, State = #invd{fitness = Fitness})
+  when
+    is_pid(Invd)
+  , is_number(Fitness)
+  ->
+    gen_server:cast(Invd, {receive_fitness, {erlang:self(), Fitness}})
 
   , {noreply, State}
 ;
 
 handle_cast(
-    {receive_state, NeighborState}
+    {receive_fitness, Neighbor = {Invd, Fitness}}
+  , State = #invd{
+        stage = Stage = #evolve{
+            neighbors = Neighbors
+          , remain = 1
+        }
+    }
+) when
+    is_pid(Invd)
+  , is_number(Fitness)
+  ->
+    gen_server:cast(erlang:self(), {do_evolve})
+
+  , NewState = State#invd{
+        stage=Stage#evolve{
+            neighbors=[Neighbor|Neighbors]
+          , remain=0
+        }
+    }
+
+  , {noreply, NewState}
+;
+
+handle_cast(
+    {receive_fitness, Neighbor = {Invd, Fitness}}
   , State = #invd{
         stage = Stage = #evolve{
             neighbors = Neighbors
           , remain = Remain
         }
     }
-) ->
-    NewRemain = Remain - 1
-
-  , if
-        NewRemain =:= 0 ->
-            % Ready to evolve
-            gen_server:cast(erlang:self(), {evolve_ready})
-
-      ; NewRemain =/= 0 ->
-            pass
-    end
-
-  , {
-        noreply
-      , State#invd{
-            stage=Stage#evolve{
-                neighbors=[NeighborState|Neighbors]
-              , remain=NewRemain
-            }
+) when
+    is_pid(Invd)
+  , is_number(Fitness)
+  ->
+    NewState = State#invd{
+        stage=Stage#evolve{
+            neighbors=[Neighbor|Neighbors]
+          , remain=Remain - 1
         }
     }
+
+  , {noreply, NewState}
 ;
 
 handle_cast(
-    {evolve_ready}
+    {do_evolve}
   , State = #invd{
         type = Type
       , fitness = Fitness
-      , stage = #evolve{neighbors = Neighbors}
+      , stage = #evolve{neighbors = Neighbors, remain = 0}
     }
 ) ->
     io:format("neighbors ~p~n", [Neighbors])
 
-  , Parent1 = Type:select(Neighbors)
-  , Parent2 = Type:select(Neighbors)
+  , ParentA = Type:select(Neighbors)
+  , ParentB = Type:select(Neighbors)
 
-  , Child = Type:mutate(Type:crossover(Parent1, Parent2))
+  , Child = Type:mutate(Type:crossover(ParentA, ParentB))
   , ChildFitness = Type:evaluate(Child)
+
+  % , evolve(erlang:self())
 
     % TODO: allow specification of minimize or maximize
   , NewState = if
@@ -145,9 +174,7 @@ handle_cast(
 ;
 
 handle_cast(_Request, State) ->
-    io:format("other request ~p~n", [_Request])
-
-  , {noreply, State}
+    {noreply, State}
 .
 
 handle_info(_Info, State) ->
@@ -191,30 +218,22 @@ init([Term | _Options], #invd{}) ->
     {error, {badarg, Term}}
 .
 
-neighbors(GA, Index = {Row, Column})
+signal_neighbors(GA, Index = {Row, Col})
   when
     is_pid(GA)
   , is_integer(Row), Row >= 0
-  , is_integer(Column), Column >= 0
+  , is_integer(Col), Col >= 0
   ->
     lists:foldl(
         fun (Invd, Count) when is_pid(Invd) ->
-            invd:send_state(Invd)
+            invd:send_fitness(Invd)
 
           , Count + 1
         end
 
       , 0
-      , ga:neighbors(GA, Index)
+      , ga:get_neighbors(GA, Index)
     )
-.
-
-send_genome(SenderInvd, ReceiverInvd) ->
-    pass
-.
-
-receive_genome(ReceiverInvd) ->
-    pass
 .
 
 %% ----------------------------------------------------------------- %%
