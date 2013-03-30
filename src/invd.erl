@@ -71,11 +71,9 @@ handle_call(_Request, _From, State) ->
 .
 
 handle_cast({evolve}, State = #invd{ga = GA, index = Index}) ->
-    pass %TODO:implement
+    Remain = neighbors(GA, Index)
 
-  , io:format("neighbors ~p~n", [neighbors(GA, Index)])
-
-  , {noreply, State#invd{stage=#evolve{}}}
+  , {noreply, State#invd{stage=#evolve{remain = Remain}}}
 ;
 
 handle_cast({send_state, Invd}, State = #invd{}) ->
@@ -95,6 +93,15 @@ handle_cast(
 ) ->
     NewRemain = Remain - 1
 
+  , if
+        NewRemain =:= 0 ->
+            % Ready to evolve
+            gen_server:cast(erlang:self(), {evolve_ready})
+
+      ; NewRemain =/= 0 ->
+            pass
+    end
+
   , {
         noreply
       , State#invd{
@@ -106,8 +113,23 @@ handle_cast(
     }
 ;
 
+handle_cast(
+    {evolve_ready}
+  , State = #invd{
+        stage = #evolve{neighbors = Neighbors}
+    }
+) ->
+    io:format("neighbors ~p~n", [Neighbors])
+
+    % TODO: do evolve
+
+  , {noreply, State}
+;
+
 handle_cast(_Request, State) ->
-    {noreply, State}
+    io:format("other request ~p~n", [_Request])
+
+  , {noreply, State}
 .
 
 handle_info(_Info, State) ->
@@ -157,11 +179,14 @@ neighbors(GA, Index = {Row, Column})
   , is_integer(Row), Row >= 0
   , is_integer(Column), Column >= 0
   ->
-    lists:map(
-        fun (Invd) when is_pid(Invd) ->
-            invd:get_state(Invd) % this could cause deadlock
+    lists:foldl(
+        fun (Invd, Count) when is_pid(Invd) ->
+            invd:send_state(Invd)
+
+          , Count + 1
         end
 
+      , 0
       , ga:neighbors(GA, Index)
     )
 .
