@@ -116,14 +116,32 @@ handle_cast(
 handle_cast(
     {evolve_ready}
   , State = #invd{
-        stage = #evolve{neighbors = Neighbors}
+        type = Type
+      , fitness = Fitness
+      , stage = #evolve{neighbors = Neighbors}
     }
 ) ->
     io:format("neighbors ~p~n", [Neighbors])
 
-    % TODO: do evolve
+  , Parent1 = Type:select(Neighbors)
+  , Parent2 = Type:select(Neighbors)
 
-  , {noreply, State}
+  , Child = Type:mutate(Type:crossover(Parent1, Parent2))
+  , ChildFitness = Type:evaluate(Child)
+
+    % TODO: allow specification of minimize or maximize
+  , NewState = if
+        Fitness > ChildFitness ->
+            State
+
+      ; Fitness =< ChildFitness ->
+            State#invd{
+                genome=Child
+              , fitness=ChildFitness
+            }
+    end
+
+  , {noreply, NewState}
 ;
 
 handle_cast(_Request, State) ->
