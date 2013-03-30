@@ -1,7 +1,7 @@
 -module(invd).
 -behaviour(gen_server).
 
--export([start/3, evolve/1, send_fitness/1]).
+-export([start/3, evolve/1]).
 -export([
     init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2
   , code_change/3
@@ -12,8 +12,13 @@
 -record(init, {}).
 
 -record(evolve, {
-    neighbors=[]
-  , remain=0
+    neighbors=[] :: list()
+  , remain=0 :: non_neg_integer()
+}).
+
+-record(crossover, {
+    parent_a :: 'undefined' | genome()
+  , parent_b :: 'undefined' | genome()
 }).
 
 %%% =============================================================== %%%
@@ -38,10 +43,6 @@ start(Type, Args, Options) when is_atom(Type), is_list(Options) ->
 
 evolve(Invd) when is_pid(Invd) ->
     gen_server:cast(Invd, {evolve})
-.
-
-send_fitness(Invd) when is_pid(Invd) ->
-    gen_server:cast(Invd, {send_fitness, erlang:self()})
 .
 
 %% ----------------------------------------------------------------- %%
@@ -94,6 +95,15 @@ handle_cast({send_fitness, Invd}, State = #invd{fitness = Fitness})
   , {noreply, State}
 ;
 
+handle_cast({send_genome, Invd}, State = #invd{genome = Genome})
+  when
+    is_pid(Invd)
+  ->
+    gen_server:cast(Invd, {receive_genome, Genome})
+
+  , {noreply, State}
+;
+
 handle_cast(
     {receive_fitness, Neighbor = {Invd, Fitness}}
   , State = #invd{
@@ -141,10 +151,46 @@ handle_cast(
 ;
 
 handle_cast(
+    {receive_genome, Genome}
+  , State = #invd{
+        stage = Stage = #crossover{
+            parent_a = undefined
+          , parent_b = undefined
+        }
+    }
+) ->
+    NewState = State#invd{
+        stage=Stage#crossover{
+            parent_a=Genome
+        }
+    }
+
+  , {noreply, NewState}
+;
+
+handle_cast(
+    {receive_genome, Genome}
+  , State = #invd{
+        stage = Stage = #crossover{
+            parent_b = undefined
+        }
+    }
+) ->
+    gen_server:cast(erlang:self(), {do_crossover})
+
+  , NewState = State#invd{
+        stage=Stage#crossover{
+            parent_b=Genome
+        }
+    }
+
+  , {noreply, NewState}
+;
+
+handle_cast(
     {do_evolve}
   , State = #invd{
         type = Type
-      , fitness = Fitness
       , stage = #evolve{neighbors = Neighbors, remain = 0}
     }
 ) ->
@@ -153,8 +199,28 @@ handle_cast(
   , ParentA = Type:select(Neighbors)
   , ParentB = Type:select(Neighbors)
 
-  , Child = Type:mutate(Type:crossover(ParentA, ParentB))
+  , send_genome(ParentA)
+  , send_genome(ParentB)
+
+  , NewState = State#invd{
+        stage=#crossover{}
+    }
+
+  , {noreply, NewState}
+;
+
+handle_cast(
+    {do_crossover}
+  , State = #invd{
+        type = Type
+      , fitness = Fitness
+      , stage = #crossover{parent_a = ParentA, parent_b = ParentB}
+    }
+) ->
+    Child = Type:mutate(Type:crossover(ParentA, ParentB))
   , ChildFitness = Type:evaluate(Child)
+
+  , io:format("child ~p (fitness ~p)~n", [Child, ChildFitness])
 
   % , evolve(erlang:self())
 
@@ -218,6 +284,18 @@ init([Term | _Options], #invd{}) ->
     {error, {badarg, Term}}
 .
 
+%% ----------------------------------------------------------------- %%
+
+send_fitness(Invd) when is_pid(Invd) ->
+    gen_server:cast(Invd, {send_fitness, erlang:self()})
+.
+
+send_genome(Invd) when is_pid(Invd) ->
+    gen_server:cast(Invd, {send_genome, erlang:self()})
+.
+
+%% ----------------------------------------------------------------- %%
+
 signal_neighbors(GA, Index = {Row, Col})
   when
     is_pid(GA)
@@ -226,7 +304,7 @@ signal_neighbors(GA, Index = {Row, Col})
   ->
     lists:foldl(
         fun (Invd, Count) when is_pid(Invd) ->
-            invd:send_fitness(Invd)
+            send_fitness(Invd)
 
           , Count + 1
         end
