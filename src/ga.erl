@@ -1,7 +1,7 @@
 -module(ga).
 -behaviour(gen_server).
 
--export([start/3, neighbors/2]).
+-export([start/4, neighbors/2]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
@@ -11,14 +11,15 @@
 %%%  API                                                            %%%
 %%% =============================================================== %%%
 
--callback get_neighbors({integer(), integer()}) -> [{integer(), integer()}].
-
--callback should_terminate(#ga{}) -> boolean().
+-callback get_neighbor_coords(
+    Index :: array_2d:index()
+  , Size :: array_2d:index()
+) -> [array_2d:index()].
 
 %% ----------------------------------------------------------------- %%
 
-start(Size, GAType, InvdType) ->
-    gen_server:start(?MODULE, [Size, GAType, InvdType], [])
+start(Size, GAType, InvdType, InvdArgs) ->
+    gen_server:start(?MODULE, [Size, GAType, InvdType, InvdArgs], [])
 .
 
 neighbors(GA, Coord = {RowIndex, ColumnIndex})
@@ -32,7 +33,7 @@ neighbors(GA, Coord = {RowIndex, ColumnIndex})
 
 %% ----------------------------------------------------------------- %%
 
-init([Size = {Rows, Columns}, GAType, InvdType])
+init([Size = {Rows, Columns}, GAType, InvdType, InvdArgs])
   when
     is_integer(Rows), Rows > 0
   , is_integer(Columns), Columns > 0
@@ -50,7 +51,7 @@ init([Size = {Rows, Columns}, GAType, InvdType])
               ->
                 {ok, Pid} = invd:start(
                     InvdType
-                  , []
+                  , InvdArgs
                   , [{ga, erlang:self()}, {index, {RowIndex, ColumnIndex}}]
                 )
 
@@ -85,7 +86,10 @@ handle_call(
             array_2d:get({NRowIndex, NColumnIndex}, Invds)
         end
 
-      , Type:get_neighbors({RowIndex, ColumnIndex})
+      , Type:get_neighbor_coords(
+            {RowIndex, ColumnIndex}
+          , array_2d:size(Invds)
+        )
     )
 
   , {reply, Neighbors, State}
