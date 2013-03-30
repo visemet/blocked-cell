@@ -214,6 +214,7 @@ handle_cast(
   , State = #invd{
         type = Type
       , fitness = Fitness
+      , optimal = Optimal
       , stage = #crossover{parent_a = ParentA, parent_b = ParentB}
     }
 ) ->
@@ -224,12 +225,13 @@ handle_cast(
 
   % , evolve(erlang:self())
 
-    % TODO: allow specification of minimize or maximize
   , NewState = if
-        Fitness > ChildFitness ->
+        Optimal =:= min, Fitness < ChildFitness
+      orelse Optimal =:= max, Fitness > ChildFitness ->
             State
 
-      ; Fitness =< ChildFitness ->
+      ; Optimal =:= min, Fitness >= ChildFitness
+      orelse Optimal =:= max, Fitness =< ChildFitness ->
             State#invd{
                 genome=Child
               , fitness=ChildFitness
