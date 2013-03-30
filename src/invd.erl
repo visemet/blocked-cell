@@ -25,7 +25,10 @@
 %%%  API                                                            %%%
 %%% =============================================================== %%%
 
--callback init(term()) -> genome().
+-callback init(Args :: term()) ->
+    {ok, Genome :: genome()}
+  | {error, Reason :: term()}
+.
 
 -callback evaluate(genome()) -> number().
 
