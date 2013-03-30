@@ -280,6 +280,13 @@ init([{index, Index = {Row, Column}} | Options], State = #invd{})
     init(Options, State#invd{index=Index})
 ;
 
+init([{optimal, Optimal} | Options], State = #invd{})
+  when
+    Optimal =:= min orelse Optimal =:= max
+  ->
+    init(Options, State#invd{optimal=Optimal})
+;
+
 init([Term | _Options], #invd{}) ->
     {error, {badarg, Term}}
 .

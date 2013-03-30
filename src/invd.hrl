@@ -6,6 +6,7 @@
   , index :: {non_neg_integer(), non_neg_integer()}
 
   , fitness=unknown :: fitness()
+  , optimal=min :: 'min' | 'max'
 
   , stage
 }).

@@ -1,20 +1,21 @@
 -module(linear5_ga).
 -behaviour(ga).
 
--export([start/3]).
+-export([start/4]).
 -export([get_neighbor_coords/2]).
 
 %%% =============================================================== %%%
 %%%  API                                                            %%%
 %%% =============================================================== %%%
 
-start(Size = {NRows, NCols}, InvdType, InvdArgs)
+start(Size = {NRows, NCols}, Optimal, InvdType, InvdArgs)
   when
     is_integer(NRows), NRows >= 0
   , is_integer(NCols), NCols >= 0
+  , Optimal =:= min orelse Optimal =:= max
   , is_atom(InvdType)
   ->
-    ga:start(Size, ?MODULE, InvdType, InvdArgs)
+    ga:start(Size, ?MODULE, Optimal, InvdType, InvdArgs)
 .
 
 %% ----------------------------------------------------------------- %%

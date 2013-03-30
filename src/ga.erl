@@ -1,7 +1,7 @@
 -module(ga).
 -behaviour(gen_server).
 
--export([start/4, get_neighbors/2]).
+-export([start/5, get_neighbors/2]).
 -export([
     init/1, handle_call/3, handle_cast/2, handle_info/2
   , terminate/2, code_change/3
@@ -20,14 +20,15 @@
 
 %% ----------------------------------------------------------------- %%
 
-start(Size = {NRows, NCols}, GAType, InvdType, InvdArgs)
+start(Size = {NRows, NCols}, GAType, Optimal, InvdType, InvdArgs)
   when
     is_integer(NRows), NRows >= 0
   , is_integer(NCols), NCols >= 0
   , is_atom(GAType)
+  , Optimal =:= min orelse Optimal =:= max
   , is_atom(InvdType)
   ->
-    gen_server:start(?MODULE, [Size, GAType, InvdType, InvdArgs], [])
+    gen_server:start(?MODULE, [Size, GAType, Optimal, InvdType, InvdArgs], [])
 .
 
 get_neighbors(GA, Index = {Row, Col})
@@ -41,11 +42,12 @@ get_neighbors(GA, Index = {Row, Col})
 
 %% ----------------------------------------------------------------- %%
 
-init([Size = {NRows, NCols}, GAType, InvdType, InvdArgs])
+init([Size = {NRows, NCols}, GAType, Optimal, InvdType, InvdArgs])
   when
     is_integer(NRows), NRows >= 0
   , is_integer(NCols), NCols >= 0
   , is_atom(GAType)
+  , Optimal =:= min orelse Optimal =:= max
   , is_atom(InvdType)
   ->
     Invds = array_2d:map(
@@ -54,7 +56,11 @@ init([Size = {NRows, NCols}, GAType, InvdType, InvdArgs])
             is_integer(Row), Row >= 0
           , is_integer(Col), Col >= 0
           ->
-            InvdOptions = [{ga, erlang:self()}, {index, {Row, Col}}]
+            InvdOptions = [
+                {ga, erlang:self()}
+              , {index, {Row, Col}}
+              , {optimal, Optimal}
+            ]
 
           , {ok, Invd} = invd:start(
                 InvdType
