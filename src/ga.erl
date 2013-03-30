@@ -1,7 +1,7 @@
 -module(ga).
 -behaviour(gen_server).
 
--export([start/3]).
+-export([start/3, neighbors/2]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
@@ -48,13 +48,20 @@ init([Size = {Rows, Columns}, GAType, InvdType])
                 is_integer(RowIndex), RowIndex >= 0
               , is_integer(ColumnIndex), ColumnIndex >= 0
               ->
-                {ok, Pid} = invd:start(InvdType, erlang:self())
+                {ok, Pid} = invd:start(
+                    InvdType
+                  , []
+                  , [{ga, erlang:self()}, {index, {RowIndex, ColumnIndex}}]
+                )
+
+              , io:format("pid ~p~n", [Pid])
+
               , Pid
             end
 
-          , array_2d:new(
+          , array_2d:new([
                 {size, Size}
-            )
+            ])
         )
     }
 
