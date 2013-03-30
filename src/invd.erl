@@ -11,6 +11,7 @@
 
 -record(evolve, {
     neighbors=[]
+  , remain=0
 }).
 
 %%% =============================================================== %%%
@@ -86,13 +87,21 @@ handle_cast({send_state, Invd}, State = #invd{}) ->
 handle_cast(
     {receive_state, NeighborState}
   , State = #invd{
-        stage = Stage = #evolve{neighbors = Neighbors}
+        stage = Stage = #evolve{
+            neighbors = Neighbors
+          , remain = Remain
+        }
     }
 ) ->
-    {
+    NewRemain = Remain - 1
+
+  , {
         noreply
       , State#invd{
-            stage=Stage#evolve{neighbors=[NeighborState|Neighbors]}
+            stage=Stage#evolve{
+                neighbors=[NeighborState|Neighbors]
+              , remain=NewRemain
+            }
         }
     }
 ;
