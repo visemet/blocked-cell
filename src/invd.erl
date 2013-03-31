@@ -1,7 +1,7 @@
 -module(invd).
 -behaviour(gen_server).
 
--export([start/3, evolve/1]).
+-export([start/3, start/4, evolve/1]).
 -export([
     init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2
   , code_change/3
@@ -41,7 +41,16 @@
 %% ----------------------------------------------------------------- %%
 
 start(Type, Args, Options) when is_atom(Type), is_list(Options) ->
-    gen_server:start(?MODULE, [Type, Args, Options], [])
+    start(erlang:now(), Type, Args, Options)
+.
+
+start(Seed = {MegaSecs, Secs, MicroSecs}, Type, Args, Options)
+  when
+    is_integer(MegaSecs), MegaSecs >= 0
+  , is_integer(Secs), Secs >= 0
+  , is_integer(MicroSecs), MicroSecs >= 0
+  ->
+    gen_server:start(?MODULE, [Seed, Type, Args, Options], [])
 .
 
 evolve(Invd) when is_pid(Invd) ->
@@ -50,8 +59,17 @@ evolve(Invd) when is_pid(Invd) ->
 
 %% ----------------------------------------------------------------- %%
 
-init([Type, Args, Options]) when is_atom(Type), is_list(Options) ->
-    case Type:init(Args) of
+init([Seed = {MegaSecs, Secs, MicroSecs}, Type, Args, Options])
+  when
+    is_integer(MegaSecs), MegaSecs >= 0
+  , is_integer(Secs), Secs >= 0
+  , is_integer(MicroSecs), MicroSecs >= 0
+  , is_atom(Type)
+  , is_list(Options)
+  ->
+    random:seed(Seed)
+
+  , case Type:init(Args) of
         {ok, Genome} ->
             init(Options, #invd{type=Type, genome=Genome, stage=#init{}})
 
@@ -197,9 +215,7 @@ handle_cast(
       , stage = #evolve{neighbors = Neighbors, remain = 0}
     }
 ) ->
-    io:format("neighbors ~p~n", [Neighbors])
-
-  , ParentA = Type:select(Neighbors)
+    ParentA = Type:select(Neighbors)
   , ParentB = Type:select(Neighbors)
 
   , send_genome(ParentA)
@@ -224,7 +240,8 @@ handle_cast(
     Child = Type:mutate(Type:crossover(ParentA, ParentB))
   , ChildFitness = Type:evaluate(Child)
 
-  , io:format("child ~p (fitness ~p)~n", [Child, ChildFitness])
+  , io:format("child ~p (fitness ~.4f)~n", [Child, ChildFitness])
+  , io:format("self ~p (fitness ~.4f)~n", [State#invd.genome, Fitness])
 
   % , evolve(erlang:self())
 
@@ -290,6 +307,15 @@ init([{optimal, Optimal} | Options], State = #invd{})
     Optimal =:= min orelse Optimal =:= max
   ->
     init(Options, State#invd{optimal=Optimal})
+;
+
+init([{seed, Seed = {MegaSecs, Secs, MicroSecs}} | Options], State = #invd{})
+  when
+    is_integer(MegaSecs), MegaSecs >= 0
+  , is_integer(Secs), Secs >= 0
+  , is_integer(MicroSecs), MicroSecs >= 0
+  ->
+    init(options, State)
 ;
 
 init([Term | _Options], #invd{}) ->

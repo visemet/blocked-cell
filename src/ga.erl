@@ -1,7 +1,7 @@
 -module(ga).
 -behaviour(gen_server).
 
--export([start/5, get_neighbors/2]).
+-export([start/5, start/6, get_neighbors/2]).
 -export([
     init/1, handle_call/3, handle_cast/2, handle_info/2
   , terminate/2, code_change/3
@@ -28,7 +28,31 @@ start(Size = {NRows, NCols}, GAType, Optimal, InvdType, InvdArgs)
   , Optimal =:= min orelse Optimal =:= max
   , is_atom(InvdType)
   ->
-    gen_server:start(?MODULE, [Size, GAType, Optimal, InvdType, InvdArgs], [])
+    start(erlang:now(), Size, GAType, Optimal, InvdType, InvdArgs)
+.
+
+start(
+    Seed = {MegaSecs, Secs, MicroSecs}
+  , Size = {NRows, NCols}
+  , GAType
+  , Optimal
+  , InvdType
+  , InvdArgs
+) when
+    is_integer(MegaSecs), MegaSecs >= 0
+  , is_integer(Secs), Secs >= 0
+  , is_integer(MicroSecs), MicroSecs >= 0
+  , is_integer(NRows), NRows >= 0
+  , is_integer(NCols), NCols >= 0
+  , is_atom(GAType)
+  , Optimal =:= min orelse Optimal =:= max
+  , is_atom(InvdType)
+  ->
+    gen_server:start(
+        ?MODULE
+      , [Seed, Size, GAType, Optimal, InvdType, InvdArgs]
+      , []
+    )
 .
 
 get_neighbors(GA, Index = {Row, Col})
@@ -42,15 +66,26 @@ get_neighbors(GA, Index = {Row, Col})
 
 %% ----------------------------------------------------------------- %%
 
-init([Size = {NRows, NCols}, GAType, Optimal, InvdType, InvdArgs])
-  when
-    is_integer(NRows), NRows >= 0
+init([
+    Seed = {MegaSecs, Secs, MicroSecs}
+  , Size = {NRows, NCols}
+  , GAType
+  , Optimal
+  , InvdType
+  , InvdArgs
+]) when
+    is_integer(MegaSecs), MegaSecs >= 0
+  , is_integer(Secs), Secs >= 0
+  , is_integer(MicroSecs), MicroSecs >= 0
+  , is_integer(NRows), NRows >= 0
   , is_integer(NCols), NCols >= 0
   , is_atom(GAType)
   , Optimal =:= min orelse Optimal =:= max
   , is_atom(InvdType)
   ->
-    Invds = array_2d:map(
+    random:seed(Seed)
+
+  , Invds = array_2d:map(
         fun ({Row, Col}, undefined)
           when
             is_integer(Row), Row >= 0
