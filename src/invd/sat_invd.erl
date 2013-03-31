@@ -23,8 +23,28 @@ select([{Invd, _Fitness} | _Rest]) ->
     Invd
 .
 
-crossover(GenomeA = #sat{}, _GenomeB = #sat{}) ->
-    GenomeA
+crossover(GenomeA = #sat{vars = VarsA}, _GenomeB = #sat{vars = VarsB}) ->
+    Length = erlang:length(VarsA)
+
+  , [Point1, Point2] = lists:sort(utils:random(1, Length, 2))
+
+  , NewVars = lists:zipwith3(
+        fun (LiteralA, LiteralB, Index) ->
+            if
+                Index < Point1 -> LiteralA
+
+              ; Index >= Point1, Index < Point2 -> LiteralB
+
+              ; Index >= Point2 -> LiteralA
+            end
+        end
+
+      , VarsA
+      , VarsB
+      , lists:seq(1, Length)
+    )
+
+  , GenomeA#sat{vars=NewVars}
 .
 
 mutate(Genome = #sat{vars = Vars}) ->
