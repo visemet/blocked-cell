@@ -27,8 +27,26 @@ crossover(GenomeA = #sat{}, _GenomeB = #sat{}) ->
     GenomeA
 .
 
-mutate(Genome = #sat{}) ->
-    Genome
+mutate(Genome = #sat{vars = Vars}) ->
+    Prob = erlang:length(Vars)
+
+  , NewVars = lists:map(
+        fun (Literal = {VarName, Value}) ->
+            Random = random:uniform()
+
+          , if
+                Value =:= 0, Random =< Prob -> {VarName, 1}
+
+              ; Value =:= 1, Random =< Prob -> {VarName, 0}
+
+              ; Random > Prob -> Literal
+            end
+        end
+
+      , Vars
+    )
+
+  , Genome#sat{vars=NewVars}
 .
 
 %%% =============================================================== %%%
