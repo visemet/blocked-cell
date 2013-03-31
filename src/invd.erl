@@ -229,12 +229,12 @@ handle_cast(
   % , evolve(erlang:self())
 
   , NewState = if
-        Optimal =:= min, Fitness < ChildFitness
-      orelse Optimal =:= max, Fitness > ChildFitness ->
+        (Optimal =:= min andalso Fitness < ChildFitness)
+      orelse (Optimal =:= max andalso Fitness > ChildFitness) ->
             State
 
-      ; Optimal =:= min, Fitness >= ChildFitness
-      orelse Optimal =:= max, Fitness =< ChildFitness ->
+      ; (Optimal =:= min andalso Fitness >= ChildFitness)
+      orelse (Optimal =:= max andalso Fitness =< ChildFitness) ->
             State#invd{
                 genome=Child
               , fitness=ChildFitness
