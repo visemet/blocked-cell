@@ -98,7 +98,8 @@ init([
             ]
 
           , {ok, Invd} = invd:start(
-                InvdType
+                rand_utils:new_seed()
+              , InvdType
               , InvdArgs
               , InvdOptions
             )
