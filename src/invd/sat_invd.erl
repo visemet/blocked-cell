@@ -27,7 +27,7 @@ select([{Invd, _Fitness} | _Rest]) ->
 crossover(GenomeA = #sat{vars = VarsA}, _GenomeB = #sat{vars = VarsB}) ->
     Length = erlang:length(VarsA)
 
-  , [Point1, Point2] = lists:sort(utils:random(1, Length, 2))
+  , [Point1, Point2] = lists:sort(rand_utils:uniform(1, Length, 2))
 
   , NewVars = lists:zipwith3(
         fun (LiteralA, LiteralB, Index) ->
@@ -85,7 +85,7 @@ init([{var_names, VarNames} | Args], State = #sat{})
   ->
     Vars = lists:zip(
         VarNames
-      , utils:random(0, 1, erlang:length(VarNames))
+      , rand_utils:uniform(0, 1, erlang:length(VarNames))
     )
 
   , init(Args, State#sat{vars=Vars})
