@@ -1,13 +1,13 @@
 -record('and', {
-    vars=[] :: [clause()]
+    clauses=[] :: [clause()]
 }).
 
 -record('or', {
-    vars=[] :: [clause()]
+    clauses=[] :: [clause()]
 }).
 
 -record('not', {
-    var=0 :: clause()
+    clause=0 :: clause()
 }).
 
 %% ----------------------------------------------------------------- %%
