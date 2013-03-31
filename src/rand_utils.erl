@@ -1,10 +1,16 @@
 -module(rand_utils).
 
--export([uniform/3]).
+-export([new_seed/0, uniform/3]).
 
 %%% =============================================================== %%%
 %%%  API                                                            %%%
 %%% =============================================================== %%%
+
+new_seed() ->
+    erlang:list_to_tuple(
+        uniform(0, 100000, 3)
+    )
+.
 
 uniform(Min, Max, Length)
   when
