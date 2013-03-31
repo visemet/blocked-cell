@@ -3,7 +3,9 @@
 
 -export([init/1, evaluate/1, select/1, crossover/2, mutate/1]).
 
--record(sat, {vars=[]}).
+-include("sat_invd.hrl").
+
+-record(sat, {vars=[], formula=1}).
 
 %%% =============================================================== %%%
 %%%  API                                                            %%%
@@ -37,13 +39,21 @@ init([], State = #sat{}) ->
     {ok, State}
 ;
 
-init([{var_names, VarNames} | Args], State = #sat{}) ->
+init([{var_names, VarNames} | Args], State = #sat{})
+  when
+    is_list(VarNames)
+  , is_list(Args)
+  ->
     Vars = lists:zip(
         VarNames
       , utils:random(0, 1, erlang:length(VarNames))
     )
 
   , init(Args, State#sat{vars=Vars})
+;
+
+init([{formula, Formula} | Args], State = #sat{}) when is_list(Args) ->
+    init(Args, State#sat{formula=Formula})
 ;
 
 init([Term, _Args], #sat{}) ->
