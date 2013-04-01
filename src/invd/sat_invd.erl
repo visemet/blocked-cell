@@ -1,7 +1,10 @@
 -module(sat_invd).
 -behaviour(invd).
 
--export([init/1, evaluate/1, select/1, crossover/2, mutate/1]).
+-export([
+    init/1, evaluate/1, select/1, crossover/2, mutate/1
+  , should_terminate/3
+]).
 
 -include("sat_invd.hrl").
 
@@ -68,6 +71,10 @@ mutate(Genome = #sat{vars = Vars}) ->
     )
 
   , Genome#sat{vars=NewVars}
+.
+
+should_terminate(Fitness, GenNo, Age) ->
+    Fitness =:= 1.0 orelse (GenNo + Age) >= 1000
 .
 
 %%% =============================================================== %%%
