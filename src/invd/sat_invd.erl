@@ -20,8 +20,8 @@ evaluate(_Genome = #sat{vars = Vars, formula = Formula}) ->
     evaluate(dict:from_list(Vars), Formula)
 .
 
-select([{Invd, _Fitness} | _Rest]) ->
-    Invd
+select(Invds) when is_list(Invds) ->
+    select:tournament(Invds, [{order, gtl}, {prob, 0.6}])
 .
 
 crossover(GenomeA = #sat{vars = VarsA}, _GenomeB = #sat{vars = VarsB}) ->
