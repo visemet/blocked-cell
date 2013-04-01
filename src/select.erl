@@ -31,7 +31,10 @@ tournament(Invds, [{order, Order} | Options], State = #tournament{}) ->
 ;
 
 tournament(Invds, [{prob, Prob} | Options], State = #tournament{}) ->
-    tournament(Invds, Options, State#tournament{prob=Prob})
+    Length = erlang:length(Invds)
+  , Scale = 1 / (1 - math:pow(1 - Prob, Length))
+
+  , tournament(Invds, Options, State#tournament{prob=Scale * Prob})
 .
 
 tournament_select(_Prob, [{Invd, _Fitness}]) ->
@@ -40,9 +43,11 @@ tournament_select(_Prob, [{Invd, _Fitness}]) ->
 
 tournament_select(Prob, [{Invd, _Fitness} | Rest]) ->
     Random = random:uniform()
+
   , if
-      Random < Prob -> Invd
-    ; Random >= Prob -> tournament_select(Prob * (1 - Prob), Rest)
+        Random < Prob -> Invd
+
+      ; Random >= Prob -> tournament_select(Prob, Rest)
     end
 .
 
