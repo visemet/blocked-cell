@@ -234,6 +234,8 @@ handle_cast(
         type = Type
       , fitness = Fitness
       , optimal = Optimal
+      , gen_no = GenNo
+      , age = Age
       , stage = #crossover{parent_a = ParentA, parent_b = ParentB}
     }
 ) ->
@@ -248,13 +250,17 @@ handle_cast(
   , NewState = if
         (Optimal =:= min andalso Fitness < ChildFitness)
       orelse (Optimal =:= max andalso Fitness > ChildFitness) ->
-            State
+            State#invd{
+                age=Age + 1
+            }
 
       ; (Optimal =:= min andalso Fitness >= ChildFitness)
       orelse (Optimal =:= max andalso Fitness =< ChildFitness) ->
             State#invd{
                 genome=Child
               , fitness=ChildFitness
+              , gen_no=GenNo + 1
+              , age=1
             }
     end
 

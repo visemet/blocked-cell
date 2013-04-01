@@ -8,6 +8,9 @@
   , fitness=unknown :: fitness()
   , optimal=min :: 'min' | 'max'
 
+  , gen_no=0 :: non_neg_integer()
+  , age=1 :: pos_integer()
+
   , stage
 }).
 
