@@ -1,7 +1,7 @@
 -module(invd).
 -behaviour(gen_server).
 
--export([start/3, start/4, evolve/1]).
+-export([start/3, start/4, evolve/1, stop/1]).
 -export([
     init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2
   , code_change/3
@@ -38,6 +38,14 @@
 
 -callback mutate(genome()) -> genome().
 
+-callback should_terminate(
+    Fitness :: number()
+  , GenNo :: non_neg_integer()
+  , Age :: pos_integer()
+) ->
+    boolean()
+.
+
 %% ----------------------------------------------------------------- %%
 
 start(Type, Args, Options) when is_atom(Type), is_list(Options) ->
@@ -55,6 +63,11 @@ start(Seed = {MegaSecs, Secs, MicroSecs}, Type, Args, Options)
 
 evolve(Invd) when is_pid(Invd) ->
     gen_server:cast(Invd, {evolve})
+.
+
+stop(Invd) when is_pid(Invd) ->
+    % gen_server:cast(Invd, {stop, was_stopped})
+    gen_server:cast(Invd, {stop, normal})
 .
 
 %% ----------------------------------------------------------------- %%
@@ -82,15 +95,50 @@ handle_call(_Request, _From, State) ->
     {reply, ok, State}
 .
 
-handle_cast({evolve}, State = #invd{ga = GA, index = Index}) ->
-    NewState = State#invd{
-        stage=#evolve{
-            neighbors=[]
-          , remain=signal_neighbors(GA, Index)
-        }
-    }
+handle_cast(
+    Request = {evolve}
+  , State = #invd{type = Type, genome = Genome, fitness = unknown}
+) ->
+    Fitness = Type:evaluate(Genome)
 
-  , {noreply, NewState}
+  , handle_cast(Request, State#invd{fitness=Fitness})
+;
+
+handle_cast(
+    {evolve}
+  , State = #invd{
+        type = Type
+      , ga = GA
+      , index = Index
+      , fitness = Fitness
+      , gen_no = GenNo
+      , age = Age
+    }
+) ->
+    case Type:should_terminate(Fitness, GenNo, Age) of
+        true ->
+            io:format(
+                "Stopping...~n\[~B ~B\] ~p (~.4f)~n"
+              , [GenNo, Age, State#invd.genome, Fitness]
+            )
+
+          % , {stop, was_evolved, State}
+          , {stop, normal, State}
+
+      ; false ->
+            NewState = State#invd{
+                stage=#evolve{
+                    neighbors=[]
+                  , remain=signal_neighbors(GA, Index)
+                }
+            }
+
+          , {noreply, NewState}
+    end
+;
+
+handle_cast({stop, Reason}, State = #invd{}) ->
+    {stop, Reason, State}
 ;
 
 handle_cast(
@@ -242,10 +290,10 @@ handle_cast(
     Child = Type:mutate(Type:crossover(ParentA, ParentB))
   , ChildFitness = Type:evaluate(Child)
 
-  , io:format("child ~p (fitness ~.4f)~n", [Child, ChildFitness])
-  , io:format("self ~p (fitness ~.4f)~n", [State#invd.genome, Fitness])
+  % , io:format("child ~p (fitness ~.4f)~n", [Child, ChildFitness])
+  % , io:format("self ~p (fitness ~.4f)~n", [State#invd.genome, Fitness])
 
-  % , evolve(erlang:self())
+  , evolve(erlang:self())
 
   , NewState = if
         (Optimal =:= min andalso Fitness < ChildFitness)

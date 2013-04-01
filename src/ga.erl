@@ -104,6 +104,7 @@ init([
               , InvdOptions
             )
 
+          , erlang:monitor(process, Invd)
           , invd:evolve(Invd)
 
           , Invd
@@ -155,6 +156,27 @@ handle_call(_Request, _From, State) ->
 handle_cast(_Request, State) ->
     {noreply, State}
 .
+
+handle_info(
+    {'DOWN', Ref, process, Invd, _Reason = normal}
+  , State = #ga{invds = Invds}
+) when
+    is_reference(Ref)
+  , is_pid(Invd)
+  ->
+    array_2d:foldl(
+        fun (_Index, I, undefined) when is_pid(I) ->
+            invd:stop(I)
+          , undefined
+        end
+
+      , undefined
+      , Invds
+    )
+
+  % , {stop, Reason, State}
+  , {noreply, State}
+;
 
 handle_info(_Info, State) ->
     {noreply, State}
