@@ -315,15 +315,6 @@ init([{optimal, Optimal} | Options], State = #invd{})
     init(Options, State#invd{optimal=Optimal})
 ;
 
-init([{seed, Seed = {MegaSecs, Secs, MicroSecs}} | Options], State = #invd{})
-  when
-    is_integer(MegaSecs), MegaSecs >= 0
-  , is_integer(Secs), Secs >= 0
-  , is_integer(MicroSecs), MicroSecs >= 0
-  ->
-    init(options, State)
-;
-
 init([Term | _Options], #invd{}) ->
     {error, {badarg, Term}}
 .
